@@ -1,0 +1,8 @@
+aws:
+  access_key_id: sejin.yun
+  secret_access_key: 12345
+  bucket_name: bucket_llm
+
+paths:
+  local_path: c:/workplace/airflow/llm
+  extract_path: c:/workplace/airflow/llm/extract/files

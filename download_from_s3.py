@@ -6,8 +6,23 @@ import glob
 # Please replace 'your_access_key', 'your_secret_key', 'your_bucket_name', 'c:/workplace/airflow/llm', and 'c:/workplace/airflow/llm/extract/files' with your actual AWS access key, secret key, bucket name, the local path where you want to download the zip files, and the path where you want to extract the zip files.
 
 # This code will delete all files in the specified local path and extract path, download all the zip files from the specified S3 bucket to the local path, and then extract each zip file to the extract path. The download_file_from_s3 function downloads a file from S3 to the local path. The unzip_file function opens a zip file and extracts all its contents to the extract path. The delete_files_in_directory function deletes all files in the specified directory. The download_and_unzip_files function first calls delete_files_in_directory to delete all files in the local path and extract path, then it gets a list of all the files in the S3 bucket, loops over the list, calls download_file_from_s3 to download each file, and then calls unzip_file to extract each file.
+#from airflow.models import Variable
+import yaml
 
-s3 = boto3.client('s3', aws_access_key_id='your_access_key', aws_secret_access_key='your_secret_key')
+with open(r'C:\workplace\new\llm\config.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+
+aws_access_key_id = config['aws']['access_key_id']
+aws_secret_access_key = config['aws']['secret_access_key']
+bucket_name = config['aws']['bucket_name']
+local_path = config['paths']['local_path']
+extract_path = config['paths']['extract_path']
+
+# aws_access_key_id = Variable.get('aws_access_key_id')
+# aws_secret_access_key = Variable.get('aws_secret_access_key')
+# bucket_name = Variable.get('bucket_name')
+
+s3 = boto3.client('s3', aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
 
 def download_file_from_s3(bucket_name, s3_file_name, local_file_name):
     s3.download_file(bucket_name, s3_file_name, local_file_name)
