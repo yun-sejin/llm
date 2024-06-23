@@ -6,3 +6,9 @@ aws:
 paths:
   local_path: c:/workplace/airflow/llm
   extract_path: c:/workplace/airflow/llm/extract/files
+
+database:
+  host: localhost
+  database: your_database_name
+  user: your_username
+  password: your_password
