@@ -9,6 +9,8 @@ import glob
 #from airflow.models import Variable
 import yaml
 
+from llm.qna_insert import read_json_file, upsert_data
+
 with open(r'C:\workplace\new\llm\config.yaml', 'r') as f:
     config = yaml.safe_load(f)
 
@@ -37,9 +39,7 @@ def delete_files_in_directory(directory):
         os.remove(f)
 
 def download_and_unzip_files(bucket_name, local_path, extract_path):
-    delete_files_in_directory(local_path)  # Delete all files in the local path
-    delete_files_in_directory(extract_path)  # Delete all files in the extract path
-
+   
     response = s3.list_objects_v2(Bucket=bucket_name)
     for object in response['Contents']:
         s3_file_name = object['Key']
@@ -47,6 +47,8 @@ def download_and_unzip_files(bucket_name, local_path, extract_path):
             local_zip_name = f"{local_path}/{s3_file_name}"
             download_file_from_s3(bucket_name, s3_file_name, local_zip_name)
             unzip_file(local_zip_name, extract_path)
+            
+           
 
 # Usage
 download_and_unzip_files('your_bucket_name', 'c:/workplace/airflow/llm', 'c:/workplace/airflow/llm/extract/files')
