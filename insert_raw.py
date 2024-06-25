@@ -4,7 +4,7 @@ import psycopg2
 from datetime import datetime, timedelta
 from json_read import read_json_files_to_dict  # Assuming this function is defined in json_read.py
 from db import upsert_data  # Ensure this import is correct based on your project structure
-from airflow.sensors.sql import SqlSensor
+from airflow.sensors.sql_sensor import SqlSensor
 
 default_args = {
     'owner': 'airflow',
