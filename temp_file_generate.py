@@ -47,4 +47,33 @@ for root, dirs, files in os.walk(target_folder):
             with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
                 zip_ref.extractall(root)
 
-            print(f"Extracted {file} in {root}")        
+            print(f"Extracted {file} in {root}")  
+
+##################################################
+        ##file명이 list = ['aaa.zip','bbb.zip','ccc.zip']으로 선언된 값중에 포함되는지로 변환
+###################################################      
+
+# Variable for the folder name
+folder_name = "aaa"
+
+# Base directory where the folder is located
+base_dir = "C:/workplace/airflow/llm/file"
+
+# Full path to the target folder
+target_folder = os.path.join(base_dir, folder_name)
+
+# List of specific file names to look for
+file_names = ['aaa.zip', 'bbb.zip', 'ccc.zip']
+
+# Iterate through each file in the target folder and its subfolders
+for root, dirs, files in os.walk(target_folder):
+    for file in files:
+        if file in file_names:
+            # Full path to the file
+            file_path = os.path.join(root, file)
+            
+            # Unzip the file
+            with zipfile.ZipFile(file_path, 'r') as zip_ref:
+                zip_ref.extractall(root)
+
+            print(f"Extracted {file} in {root}")
