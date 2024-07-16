@@ -85,13 +85,51 @@ def example_dag():
                 cursor.execute(insert_job_hist_sql, (job_id, datetime.datetime.now()))
 
                 # dsllm_raw 테이블에 INSERT
+                # data_list는 삽입할 데이터의 리스트로, 각 항목은 (src_id, data_column) 형태의 튜플입니다.
                 data_list = [
-                    ("key1", "value1"),
-                    ("key2", "value2"),
+                (1, 'example_data_1'),
+                (2, 'example_data_2'),
+                (3, 'example_data_3'),
                     # 여기에 더 많은 데이터 튜플을 추가할 수 있습니다.
                 ]
-                insert_query = "INSERT INTO dsllm_raw (key_column, data_column) VALUES (%s, %s)"
-                extras.execute_batch(cursor, insert_query, data_list)
+               
+                # 임시 테이블 생성
+                cursor.execute("""
+                    CREATE TEMP TABLE temp_table AS
+                    SELECT * FROM dsllm_raw WHERE 1=0;
+                """)
+
+                # execute_batch를 사용하여 temp_table에 데이터 삽입
+                query = "INSERT INTO temp_table (src_id, data_column) VALUES (%s, %s)"
+                psycopg2.extras.execute_batch(cursor, query, data_list)
+
+                # execute_values를 사용하여 temp_table에 데이터 삽입
+                query = "INSERT INTO temp_table (src_id, data_column) VALUES %s"
+                psycopg2.extras.execute_values(cursor, query, data_list)
+                
+                # temp_table과 dsllm_raw를 src_id로 조인하여 dsllm_raw_insert에 데이터 삽입
+                cursor.execute("""
+                    INSERT INTO dsllm_raw_insert (src_id, data_column)
+                    SELECT t.src_id, t.data_column
+                    FROM temp_table t
+                    JOIN dsllm_raw d ON t.src_id = d.src_id
+                """)
+
+
+# execute_batch의 실행 시간을 10초 이내로 단축하기 위해 몇 가지 방법을 시도할 수 있습니다. 데이터베이스 삽입 작업의 성능을 향상시키는 일반적인 접근 방법은 다음과 같습니다:
+
+# Batch Size 조정: execute_batch의 배치 크기를 조정하여 최적의 성능을 찾습니다. 너무 큰 배치 크기는 메모리 사용량을 증가시킬 수 있고, 너무 작은 배치 크기는 네트워크 호출 오버헤드를 증가시킬 수 있습니다.
+
+# 인덱스 일시적 제거: 데이터 삽입 전에 대상 테이블의 인덱스를 일시적으로 제거하고, 데이터 삽입 후 인덱스를 다시 생성합니다. 인덱스 재구성은 데이터 삽입 속도를 늦출 수 있기 때문입니다.
+
+# 트랜잭션 관리: 가능하다면, 전체 배치 작업을 단일 트랜잭션으로 처리합니다. 이는 트랜잭션 오버헤드를 줄이고 성능을 향상시킬 수 있습니다.
+
+# 병렬 처리: 데이터를 여러 부분으로 나누고, 각 부분을 별도의 스레드나 프로세스에서 병렬로 삽입합니다. 이 방법은 데이터베이스와 애플리케이션 서버 모두에서 충분한 리소스가 있을 때 효과적일 수 있습니다.
+
+# 임시 테이블 사용: 데이터를 임시 테이블에 먼저 삽입하고, 그 후에 대량의 데이터를 메인 테이블로 이동합니다. 이 방법은 데이터베이스에 따라 성능을 크게 향상시킬 수 있습니다.
+
+# 데이터베이스 설정 최적화: 데이터베이스의 설정을 조정하여 삽입 성능을 향상시킬 수 있습니다. 예를 들어, PostgreSQL에서는 wal_level, checkpoint_segments, max_wal_size 등의 설정을 조정할 수 있습니다.
+
 
                 # dsllm_job_hist 테이블의 end_date 업데이트
                 update_job_hist_sql = """
