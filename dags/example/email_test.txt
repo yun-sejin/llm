@@ -1,0 +1,64 @@
+To send email notifications to sj.yun@hotmail.com and luemier@hotmail.com when a specific task fails, you can use Airflow's email alerting capabilities. You need to configure the email settings in your Airflow configuration file (airflow.cfg) and then set up the email alert in your DAG definition.
+
+Step 1: Configure Email Settings in airflow.cfg
+Ensure that your airflow.cfg file is configured with the appropriate SMTP settings. Here is an example configuration:
+
+[smtp]
+smtp_host = smtp.example.com
+smtp_starttls = True
+smtp_ssl = False
+smtp_user = your_email@example.com
+smtp_password = your_password
+smtp_port = 587
+smtp_mail_from = your_email@example.com
+
+Step 2: Update the DAG to Send Email Alerts on Task Failure
+Modify your DAG definition to include email alerts on task failure. You can use the email_on_failure parameter and the email parameter in the task definition.
+
+Updated sample.py
+
+from airflow.utils.email import send_email  # Import send_email
+import pendulum
+from airflow.decorators import dag, task
+
+def failure_callback(context):
+    subject = f"DAG {context['dag'].dag_id} - Task {context['task_instance'].task_id} Failed"
+    html_content = f"""
+    <h3>DAG: {context['dag'].dag_id}</h3>
+    <p>Task: {context['task_instance'].task_id} failed.</p>
+    <p>Execution Date: {context['execution_date']}</p>
+    <p>Log URL: <a href="{context['task_instance'].log_url}">Log</a></p>
+    """
+    send_email(['sj.yun@hotmail.com', 'luemier@hotmail.com'], subject, html_content)
+
+@dag(
+    schedule="*/10 * * * *",
+    start_date=pendulum.datetime(2021, 1, 1, tz="UTC"),
+    catchup=False,
+)
+def my_dag():
+    @task(on_failure_callback=failure_callback)
+    def first_task():
+        print("This is the first task.")
+        # Simulate task failure for demonstration purposes
+        raise ValueError("This is a simulated task failure in first_task.")
+
+    @task(on_failure_callback=failure_callback)
+    def end_task():
+        # Simulate task failure for demonstration purposes
+        raise ValueError("This is a simulated task failure in end_task.")
+
+    first_task() >> end_task()
+
+dag_instance = my_dag()
+
+
+Explanation
+Import Statements: Ensure all necessary modules are imported, including send_email, pendulum, and decorators from airflow.decorators.
+Failure Callback Function: The failure_callback function sends an email to sj.yun@hotmail.com and luemier@hotmail.com when a task fails.
+DAG Definition: The @dag decorator defines the DAG with a schedule of */10 * * * *, a start date, and no catchup.
+First Task: The first_task function is defined and decorated with @task, including the on_failure_callback parameter to enable email notifications on task failure. The task is designed to fail for demonstration purposes by raising a ValueError.
+End Task: The end_task function is defined and decorated with @task, including the on_failure_callback parameter to enable email notifications on task failure. The task is designed to fail for demonstration purposes by raising a ValueError.
+Task Dependencies: The first_task is set to run before the end_task using the >> operator.
+This setup ensures that an email is sent to sj.yun@hotmail.com and luemier@hotmail.com whenever either first_task or end_task fails.
+
