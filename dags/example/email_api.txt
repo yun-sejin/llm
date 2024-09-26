@@ -1,0 +1,69 @@
+REST API를 사용하여 이메일을 보내도록 변경하려면, Python의 requests 라이브러리를 사용하여 HTTP 요청을 보낼 수 있습니다. 다음은 Knox Mail API 대신 REST API를 사용하여 이메일을 보내는 예제입니다.
+
+1. requests 라이브러리 설치
+먼저 requests 라이브러리를 설치합니다.
+
+pip install requests
+
+2. 이메일 전송 함수 작성
+REST API를 사용하여 이메일을 보내는 함수를 작성합니다.
+
+import requests
+import logging
+
+def setup_logger(name: str) -> logging.Logger:
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    return logger
+
+logger = setup_logger(__name__)
+
+def send_email_via_rest_api(to_email, subject, body):
+    url = "https://mail.a/mail/send"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer YOUR_API_KEY"
+    }
+    data = {
+        "to": to_email,
+        "subject": subject,
+        "body": body
+    }
+    try:
+        response = requests.post(url, json=data, headers=headers)
+        response.raise_for_status()
+        logger.info(f"Email sent to {to_email} with status code {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error sending email: {e}")
+
+# 예제 사용
+send_email_via_rest_api("recipient@example.com", "Test Subject", "Test Body")
+
+3. Airflow DAG에 통합
+이제 Airflow DAG에서 REST API를 사용하여 이메일을 보낼 수 있습니다.
+
+
+import pendulum
+from airflow.decorators import dag, task
+from airflow.operators.empty import EmptyOperator
+
+@dag(
+    schedule="*/10 * * * *",
+    start_date=pendulum.datetime(2021, 1, 1, tz="UTC"),
+    catchup=False,
+)
+def my_dag():
+    start = EmptyOperator(task_id="start")
+    end = EmptyOperator(task_id="end")
+
+    start >> end
+
+dag_instance = my_dag()
+
+이제 REST API를 사용하여 이메일을 보낼 수 있습니다. send_email_via_rest_api 함수를 사용하여 이메일을 전송합니다. YOUR_API_KEY를 실제 API 키로 대체해야 합니다.
+

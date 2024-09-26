@@ -1,0 +1,110 @@
+Java로 구현된 Knox Mail API를 사용하여 이메일을 보내도록 변경하려면, Python 코드에서 Java 코드를 호출할 수 있는 방법을 사용해야 합니다. 이를 위해 Jython 또는 Py4J와 같은 라이브러리를 사용할 수 있습니다. 여기서는 Py4J를 사용하여 Java 코드를 호출하는 방법을 설명하겠습니다.
+
+1. Knox Mail API Java 코드 작성
+먼저, Knox Mail API를 사용하여 이메일을 보내는 Java 클래스를 작성합니다.
+
+
+
+// KnoxMailSender.java
+import org.apache.knox.gateway.shell.KnoxSession;
+import org.apache.knox.gateway.shell.KnoxSession.KnoxSessionBuilder;
+import org.apache.knox.gateway.shell.email.Email;
+
+public class KnoxMailSender {
+    private String knoxUrl;
+    private String username;
+    private String password;
+
+    public KnoxMailSender(String knoxUrl, String username, String password) {
+        this.knoxUrl = knoxUrl;
+        this.username = username;
+        this.password = password;
+    }
+
+    public void sendEmail(String to, String subject, String body) throws Exception {
+        KnoxSession session = KnoxSession.builder()
+            .knoxUrl(knoxUrl)
+            .basicAuth(username, password)
+            .build();
+
+        Email.send(session)
+            .to(to)
+            .subject(subject)
+            .body(body)
+            .execute();
+    }
+}
+
+2. Py4J 설치
+Py4J를 설치합니다.
+
+pip install py4j
+
+3. Python 코드에서 Java 코드 호출
+Python 코드에서 Py4J를 사용하여 Java 클래스를 호출합니다.
+
+import os
+import logging
+from py4j.java_gateway import JavaGateway, GatewayParameters, launch_gateway
+
+def setup_logger(name: str) -> logging.Logger:
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    return logger
+
+logger = setup_logger(__name__)
+
+def send_email_via_knox(to_email, subject, body):
+    try:
+        # KnoxMailSender Java 클래스를 호출하기 위해 Py4J 게이트웨이 시작
+        gateway = launch_gateway(classpath="path/to/knox-mail-sender.jar")
+        knox_mail_sender = gateway.jvm.KnoxMailSender(
+            "https://knox.example.com:8443/gateway", "username", "password"
+        )
+        knox_mail_sender.sendEmail(to_email, subject, body)
+        logger.info(f"Email sent to {to_email}")
+    except Exception as e:
+        logger.error(f"Error sending email: {e}")
+
+# 예제 사용
+send_email_via_knox("recipient@example.com", "Test Subject", "Test Body")
+
+GitHub Copilot
+Java로 구현된 Knox Mail API를 사용하여 이메일을 보내도록 변경하려면, Python 코드에서 Java 코드를 호출할 수 있는 방법을 사용해야 합니다. 이를 위해 Jython 또는 Py4J와 같은 라이브러리를 사용할 수 있습니다. 여기서는 Py4J를 사용하여 Java 코드를 호출하는 방법을 설명하겠습니다.
+
+1. Knox Mail API Java 코드 작성
+먼저, Knox Mail API를 사용하여 이메일을 보내는 Java 클래스를 작성합니다.
+
+2. Py4J 설치
+Py4J를 설치합니다.
+
+3. Python 코드에서 Java 코드 호출
+Python 코드에서 Py4J를 사용하여 Java 클래스를 호출합니다.
+
+4. Airflow DAG에 통합
+이제 Airflow DAG에서 Knox Mail API를 사용하여 이메일을 보낼 수 있습니다.
+
+import pendulum
+from airflow.decorators import dag, task
+from airflow.operators.empty import EmptyOperator
+
+@dag(
+    schedule="*/10 * * * *",
+    start_date=pendulum.datetime(2021, 1, 1, tz="UTC"),
+    catchup=False,
+)
+def my_dag():
+    start = EmptyOperator(task_id="start")
+    end = EmptyOperator(task_id="end")
+
+    start >> end
+
+dag_instance = my_dag()
+
+이제 Knox Mail API를 사용하여 이메일을 보낼 수 있습니다. send_email_via_knox 함수를 사용하여 이메일을 전송합니다. knox-mail-sender.jar 파일의 경로를 올바르게 설정해야 합니다.
+
