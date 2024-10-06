@@ -1,0 +1,1 @@
+airflow variables set dag_info '{"dag_id": "my_dag", "schedule_interval": "0 0 * * *", "start_date": "2024-09-28", "catchup": false}'

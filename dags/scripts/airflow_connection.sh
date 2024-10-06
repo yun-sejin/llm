@@ -1,0 +1,1 @@
+airflow connections add 'my_connection' --conn-uri 'http://my-connection:8080' --conn-type 'http' --conn-login 'my_user' --conn-password 'my_password' 

@@ -33,3 +33,6 @@ def email_task():
     first_task() >> end_task()
 
 dag_instance = email_task()
+
+if __name__ == 'main':
+    dag_instance.test()
