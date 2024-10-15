@@ -18,6 +18,7 @@ dag_info = Variable.get("dag_info", deserialize_json=True)
     start_date=pendulum.parse(dag_info.get("start_date", "2024-04-10T00:00:00Z")).in_timezone("UTC"),
     catchup=dag_info.get("catchup", False),
 )
+
 def my_dag():
     @task
     def start_task():

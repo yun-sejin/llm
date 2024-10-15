@@ -1,0 +1,79 @@
+주어진 조건에 따라 url 변수가 {'url': 'https://www.naver.com', 'title': 'null', 'description': 'null'}인 경우를 처리하는 예제를 작성하겠습니다. 리스트 컴프리헨션을 사용하여 URL을 처리하고, 결과를 출력하는 코드를 작성합니다.
+
+url = {'url': 'https://www.naver.com', 'title': 'null', 'description': 'null'}
+
+# URL을 처리
+processed_url = {"url": url, "title": "null", "description": "null"} if isinstance(url, str) else url
+
+# 결과 출력
+print(processed_url)
+
+설명
+url 변수는 딕셔너리 {'url': 'https://www.naver.com', 'title': 'null', 'description': 'null'}을 가집니다.
+리스트 컴프리헨션 대신 단일 URL을 처리하는 조건문을 사용합니다.
+URL이 문자열 타입인 경우, {"url": url, "title": "null", "description": "null"} 형식의 딕셔너리로 변환합니다.
+문자열 타입이 아닌 경우, 원래의 값을 그대로 사용합니다.
+processed_url 변수에 처리된 결과를 저장하고, 결과를 출력합니다.
+출력 결과
+
+{'url': 'https://www.naver.com', 'title': 'null', 'description': 'null'}
+
+
+이 코드는 url 변수가 {'url': 'https://www.naver.com', 'title': 'null', 'description': 'null'}인 경우를 처리하고, 결과를 출력합니다. URL이 이미 딕셔너리 타입이므로, 원래의 값을 그대로 사용합니다.
+
+-------------------
+
+주어진 조건에 따라 url 변수가 "https://www.naver.com"인 경우를 처리하는 예제를 작성하겠습니다. 리스트 컴프리헨션을 사용하지 않고 단일 URL을 처리하고, 결과를 출력하는 코드를 작성합니다.
+
+예제 코드
+url = "https://www.naver.com"
+
+# URL을 처리
+processed_url = {"url": url, "title": "null", "description": "null"} if isinstance(url, str) else url
+
+# 결과 출력
+print(processed_url)
+
+
+설명
+url 변수는 문자열 "https://www.naver.com"을 가집니다.
+URL이 문자열 타입인 경우, {"url": url, "title": "null", "description": "null"} 형식의 딕셔너리로 변환합니다.
+문자열 타입이 아닌 경우, 원래의 값을 그대로 사용합니다.
+processed_url 변수에 처리된 결과를 저장하고, 결과를 출력합니다.
+출력 결과
+
+{'url': 'https://www.naver.com', 'title': 'null', 'description': 'null'}
+
+이 코드는 url 변수가 "https://www.naver.com"인 경우를 처리하고, 결과를 출력합니다. URL이 문자열 타입이므로, {"url": url, "title": "null", "description": "null"} 형식의 딕셔너리로 변환됩니다.
+
+
+---------------------------
+예제 코드
+urls = [
+    "https://www.naver.com",
+    {"url": "https://www.google.com", "title": "Google", "description": "Search Engine"},
+    "https://www.example.com"
+]
+
+# 리스트 컴프리헨션을 사용하여 URL을 처리
+processed_urls = [
+    {"url": url, "title": "null", "description": "null"} if isinstance(url, str) else url
+    for url in urls
+]
+
+# 결과 출력
+for url in processed_urls:
+    print(url)
+
+
+설명
+urls 리스트에는 문자열 타입의 URL과 딕셔너리 타입의 URL이 혼합되어 있습니다.
+리스트 컴프리헨션을 사용하여 urls 리스트를 순회하면서 각 URL을 처리합니다.
+각 URL이 문자열 타입인 경우, {"url": url, "title": "null", "description": "null"} 형식의 딕셔너리로 변환합니다.
+문자열 타입이 아닌 경우, 원래의 딕셔너리 값을 그대로 사용합니다.
+processed_urls 리스트에 처리된 결과를 저장하고, 각 URL을 출력합니다.
+출력 결과
+
+{'url': 'https://www.naver.com', 'title': 'null', 'description': 'null'}
+{'url': 'https://www.google.com', 'title': 'Google', 'description': 'Search Engine'}
+{'url': 'https://www.example.com', 'title': 'null', 'description': 'null'}
