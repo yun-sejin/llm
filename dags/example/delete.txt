@@ -1,0 +1,115 @@
+Airflow에서 load_raw 태스크를 수행한 후, job_id_list를 사용하여 delete_image 태스크를 추가하고, 각 job_id에 대해 HTTP 요청을 보내 이미지를 삭제하는 예제를 작성하겠습니다. 이를 위해 HttpSensor와 HttpOperator를 사용할 수 있습니다.
+
+수정된 코드
+
+import pendulum
+from airflow import DAG
+from airflow.decorators import dag, task, task_sensor
+from airflow.providers.postgres.hooks.postgres import PostgresHook
+from airflow.providers.http.operators.http import SimpleHttpOperator
+
+# DAG 기본 설정
+default_args = {
+    'owner': 'airflow',
+    'start_date': pendulum.datetime(2023, 1, 1, tz="UTC"),
+    'retries': 1,
+    'retry_delay': pendulum.duration(minutes=5),
+}
+
+# DAG 정의
+@dag(
+    default_args=default_args,
+    schedule_interval='@hourly',  # 매시간마다 DAG 실행
+    catchup=False,
+)
+def check_upload_delete_dag():
+    
+    # SQL 센서 정의
+    @task_sensor(poke_interval=300, timeout=60, mode='poke')  # 5분마다 실행
+    def check_upload_delete():
+        hook = PostgresHook(postgres_conn_id='your_postgres_connection')
+        records = hook.get_records("""
+            SELECT 1 
+            FROM dsllm_job_his 
+            WHERE job_end_point = '/delete' 
+              AND job_type = 'fastapi' 
+              AND after_job_id IS NULL 
+              AND success_yn = TRUE
+        """)
+        return len(records) > 0
+
+    # get_job_id_list 태스크 정의
+    @task
+    def get_job_id_list():
+        hook = PostgresHook(postgres_conn_id='your_postgres_connection')
+        records = hook.get_records("""
+            SELECT job_id 
+            FROM dsllm_job_his 
+            WHERE job_end_point = '/delete' 
+              AND job_type = 'fastapi' 
+              AND after_job_id IS NULL 
+              AND success_yn = TRUE
+        """)
+        return [record[0] for record in records]
+
+    # load_raw 태스크 정의
+    @task
+    def load_raw(job_id):
+        print(f"Processing job_id: {job_id}")
+        # 여기에 실제 로드 로직을 추가합니다.
+
+    # delete_image 태스크 정의
+    @task
+    def delete_image(job_id):
+        image_id = job_id  # job_id를 image_id로 사용
+        delete_url = f"http://repo.image.com:8080/delete/{image_id}"
+        response = requests.delete(delete_url)
+        if response.status_code == 200:
+            print(f"Successfully deleted image with ID: {image_id}")
+        else:
+            print(f"Failed to delete image with ID: {image_id}, Status Code: {response.status_code}")
+
+    # 태스크 의존성 설정
+    job_ids = get_job_id_list()
+    check_upload_delete() >> job_ids.expand(job_id=job_ids) >> load_raw.partial().expand(job_id=job_ids) >> delete_image.partial().expand(job_id=job_ids)
+
+# DAG 인스턴스 생성
+dag_instance = check_upload_delete_dag()
+
+설명
+DAG 기본 설정:
+
+default_args를 정의하여 DAG의 기본 설정을 지정합니다.
+DAG 정의:
+
+@dag 데코레이터를 사용하여 check_upload_delete_dag라는 이름의 DAG을 정의합니다.
+schedule_interval을 @hourly로 설정하여 매시간마다 DAG이 실행되도록 합니다.
+SQL 센서 정의:
+
+@task_sensor 데코레이터를 사용하여 check_upload_delete 함수를 센서 태스크로 정의합니다.
+poke_interval을 300초(5분)로 설정하여 센서가 5분마다 실행되도록 합니다.
+timeout을 60초로 설정하여 1분 동안 응답이 없으면 종료되도록 합니다.
+센서 함수 내부에서 PostgresHook을 사용하여 데이터베이스 쿼리를 실행하고, 조건이 만족되면 True를 반환합니다.
+get_job_id_list 태스크 정의:
+
+@task 데코레이터를 사용하여 get_job_id_list 함수를 태스크로 정의합니다.
+PostgresHook을 사용하여 데이터베이스에서 조건을 만족하는 job_id를 가져옵니다.
+가져온 job_id 리스트를 반환합니다.
+load_raw 태스크 정의:
+
+@task 데코레이터를 사용하여 load_raw 함수를 태스크로 정의합니다.
+job_id를 인자로 받아 처리합니다.
+실제 로드 로직을 추가할 수 있습니다.
+delete_image 태스크 정의:
+
+@task 데코레이터를 사용하여 delete_image 함수를 태스크로 정의합니다.
+job_id를 인자로 받아 HTTP 요청을 통해 이미지를 삭제합니다.
+requests.delete를 사용하여 http://repo.image.com:8080/delete/{image_id} URL로 DELETE 요청을 보냅니다.
+응답 상태 코드를 확인하여 성공 또는 실패 메시지를 출력합니다.
+태스크 의존성 설정:
+
+check_upload_delete 센서가 조건을 만족할 때만 get_job_id_list 태스크가 실행되도록 의존성을 설정합니다.
+get_job_id_list 태스크의 출력을 expand를 사용하여 load_raw 태스크로 매핑합니다.
+load_raw 태스크의 출력을 expand를 사용하여 delete_image 태스크로 매핑합니다.
+이 코드는 load_raw 태스크를 수행한 후, job_id_list를 사용하여 delete_image 태스크를 추가하고, 각 job_id에 대해 HTTP 요청을 보내 이미지를 삭제하는 예제입니다. 이를 통해 데이터베이스에서 조건을 만족하는 job_id 리스트를 가져와 각 job_id에 대해 load_raw와 delete_image 태스크를 순차적으로 실행할 수 있습니다.
+

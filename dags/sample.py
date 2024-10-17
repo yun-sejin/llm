@@ -10,28 +10,40 @@ from airflow.models import Variable
 logger = logging.getLogger(__name__)
 
 dag_info = Variable.get("dag_info", deserialize_json=True)
-# dag_info_str = Variable.get("dag_info")
-# dag_info = json.loads(dag_info_str)
+
 @dag(
-    dag_id=dag_info.get("dag_id"),
-    schedule=dag_info.get("schedule", "*/10 * * * *"),
+    dag_id="delete",
+    schedule="*/10 * * * *",
     start_date=pendulum.parse(dag_info.get("start_date", "2024-04-10T00:00:00Z")).in_timezone("UTC"),
-    catchup=dag_info.get("catchup", False),
+    catchup=False,
 )
 
-def my_dag():
+def delete():
     @task
-    def start_task():
+    def check_upload_delete():
         logger.info("This is the first task.")
         # pass  # 실제 작업이 없으므로 pass 사용
 
     @task
-    def end_task():
-        pass  # 실제 작업이 없으므로 pass 사용
+    def get_job_id_list():
+        job_id = []
+        return job_id
+    
+    @task
+    def load_raw(job_id, **kwargs):
+        return job_id
+    
+    @task
+    def dedup():
+        pass
+    
+    @task
+    def parse():
+        pass
 
-    start_task() >> end_task()
+    check_upload_delete() >> get_job_id_list() >> load_raw() >> dedup() >> parse()
 
-dag_instance = my_dag()
+dag_instance = delete()
 
 if __name__ == "__main__":
     dag_instance.test()
