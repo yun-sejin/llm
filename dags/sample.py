@@ -12,13 +12,13 @@ logger = logging.getLogger(__name__)
 dag_info = Variable.get("dag_info", deserialize_json=True)
 
 @dag(
-    dag_id="delete",
+    dag_id="delete2",
     schedule="*/10 * * * *",
     start_date=pendulum.parse(dag_info.get("start_date", "2024-04-10T00:00:00Z")).in_timezone("UTC"),
     catchup=False,
 )
 
-def delete():
+def delete2():
     @task
     def check_upload_delete():
         logger.info("This is the first task.")
@@ -29,9 +29,9 @@ def delete():
         job_id = []
         return job_id
     
-    @task
-    def load_raw(job_id, **kwargs):
-        return job_id
+    # @task
+    # def load_raw(job_id, **kwargs):
+    #     return job_id
     
     @task
     def dedup():
@@ -41,9 +41,9 @@ def delete():
     def parse():
         pass
 
-    check_upload_delete() >> get_job_id_list() >> load_raw() >> dedup() >> parse()
+    check_upload_delete() >> get_job_id_list() >> dedup() >> parse()
 
-dag_instance = delete()
+dag_instance = delete2()
 
 if __name__ == "__main__":
     dag_instance.test()
