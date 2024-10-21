@@ -1,0 +1,73 @@
+Airflow에서 특정 DAG를 skip 상태로 처리하려면, airflow.cfg 설정 파일을 통해 직접적으로 설정할 수는 없습니다. 대신, DAG 파일 내에서 조건을 확인하고, 조건이 만족되면 태스크를 skip 상태로 처리하는 방법을 사용할 수 있습니다. 이를 위해 Variable을 사용하여 airflow.cfg에서 설정한 값을 DAG 파일에서 읽어와 조건을 확인할 수 있습니다.
+
+1. airflow.cfg 설정
+airflow.cfg 파일에 변수를 설정합니다. 예를 들어, delete_dag_skip 변수를 설정합니다.
+
+airflow.cfg
+
+[variables]
+delete_dag_skip = True
+
+2. DAG 파일 수정
+DAG 파일에서 Variable을 읽어와 조건을 확인하고, 조건이 만족되면 태스크를 skip 상태로 처리합니다.
+
+delete.py
+
+import pendulum
+import logging
+from airflow.decorators import dag, task
+from airflow.exceptions import AirflowSkipException
+from airflow.models import Variable
+
+logger = logging.getLogger(__name__)
+
+# airflow.cfg에서 설정한 변수를 읽어옵니다.
+delete_dag_skip = Variable.get("delete_dag_skip", default_var=False, deserialize_json=True)
+
+@dag(
+    dag_id="delete",
+    schedule="*/10 * * * *",
+    start_date=pendulum.parse("2024-04-10T00:00:00Z").in_timezone("UTC"),
+    catchup=False,
+    is_paused_upon_creation=True,  # DAG가 생성될 때 자동으로 사용 중지
+)
+def delete():
+    @task
+    def check_upload_delete():
+        logger.info("This is the first task.")
+        # delete_dag_skip 변수가 True이면 태스크를 skip 처리
+        if delete_dag_skip:
+            raise AirflowSkipException("This DAG has been disabled.")
+        # 실제 작업 로직을 여기에 추가합니다.
+
+    @task
+    def get_job_id_list():
+        job_id = []
+        return job_id
+    
+    @task
+    def dedup():
+        pass
+    
+    @task
+    def parse():
+        pass
+
+    # 태스크 의존성 설정
+    check_upload_delete() >> get_job_id_list() >> dedup() >> parse()
+
+dag_instance = delete()
+
+
+설명
+airflow.cfg 설정:
+
+airflow.cfg 파일의 [variables] 섹션에 delete_dag_skip 변수를 설정합니다.
+delete_dag_skip = True로 설정하여 DAG를 skip 상태로 처리하도록 설정합니다.
+DAG 파일 수정:
+
+Variable.get("delete_dag_skip", default_var=False, deserialize_json=True)를 사용하여 airflow.cfg에서 설정한 변수를 읽어옵니다.
+delete_dag_skip 변수가 True이면 AirflowSkipException을 발생시켜 태스크를 skip 상태로 처리합니다.
+@task 데코레이터를 사용하여 태스크를 정의하고, 태스크 의존성을 설정합니다.
+이 코드는 airflow.cfg 설정 파일을 통해 특정 DAG를 skip 상태로 처리하는 방법을 보여줍니다. 이를 통해 airflow.cfg에서 설정한 값을 DAG 파일에서 읽어와 조건을 확인하고, 조건이 만족되면 태스크를 skip 상태로 처리할 수 있습니다.
+
