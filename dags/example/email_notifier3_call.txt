@@ -1,0 +1,174 @@
+Airflow에서 on_retry_callback도 __call__ 메서드에서 호출하도록 변경하려면, __call__ 메서드 내에서 실패와 재실행을 구분하여 각각 notify_on_failure와 notify_on_retry 메서드를 호출하도록 수정할 수 있습니다. 아래는 수정된 예제입니다.
+
+수정된 코드
+file:///home/luemier/llm/dags/emailNotifier.py
+
+
+import requests
+import logging
+from pathlib import Path
+from jinja2 import Template
+from airflow.utils.context import Context
+from airflow.configuration import conf
+from basenotifier import BaseNotifier
+
+logger = logging.getLogger(__name__)
+
+class EmailNotifier(BaseNotifier):
+    def __init__(self, from_email: str, to: list):
+        super().__init__()
+        self.from_email = from_email
+        self.to = to
+        self.api_endpoint = "http://your-api-endpoint.com/send-email"  # API 엔드포인트를 클래스 내부에서 설정
+        self.subject_template_path = conf.get('smtp', 'subject_template_path', fallback='/home/luemier/llm/.venv/lib/python3.10/site-packages/airflow/providers/smtp/notifications/templates/email_subject.jinja2')  # 이메일 제목 템플릿 파일 경로
+        self.html_template_path = conf.get('smtp', 'html_template_path', fallback='/path/to/email.html')  # 이메일 내용 템플릿 파일 경로
+
+    def notify(self, context: Context, status: str):
+        # 이메일 제목 템플릿 파일의 내용을 읽어와 템플릿으로 사용
+        subject_template_content = Path(self.subject_template_path).read_text()
+        subject_template = Template(subject_template_content)
+        subject = subject_template.render(
+            ti=context['task_instance'],
+            dag=context['dag'],
+            status=status
+        )
+
+        # 이메일 내용 템플릿 파일의 내용을 읽어와 템플릿으로 사용
+        html_template_content = Path(self.html_template_path).read_text()
+        html_template = Template(html_template_content)
+        html_content = html_template.render(
+            dag_id=context['dag'].dag_id,
+            task_id=context['task_instance'].task_id,
+            execution_date=str(context['execution_date']),
+            log_url=context['task_instance'].log_url,
+            try_number=context['task_instance'].try_number,
+            status=status,
+            ti=context['task_instance']
+        )
+
+        message = {
+            "from": self.from_email,
+            "to": self.to,
+            "subject": subject,
+            "html_content": html_content,
+            "dag_id": context['dag'].dag_id,
+            "task_id": context['task_instance'].task_id,
+            "execution_date": str(context['execution_date']),
+            "log_url": context['task_instance'].log_url
+        }
+        
+        response = requests.post(self.api_endpoint, json=message)
+        
+        if response.status_code != 200:
+            logger.error(f"Failed to send email via API. Status code: {response.status_code}, Response: {response.text}")
+        else:
+            logger.info("Email sent successfully via API.")
+
+    def __call__(self, context: Context):
+        if context['task_instance'].try_number > 1:
+            self.notify_on_retry(context)
+        else:
+            self.notify_on_failure(context)
+
+    def notify_on_failure(self, context: Context):
+        self.notify(context, "failed")
+
+    def notify_on_retry(self, context: Context):
+        self.notify(context, "retried")
+
+
+        GitHub Copilot
+Airflow에서 on_retry_callback도 __call__ 메서드에서 호출하도록 변경하려면, __call__ 메서드 내에서 실패와 재실행을 구분하여 각각 notify_on_failure와 notify_on_retry 메서드를 호출하도록 수정할 수 있습니다. 아래는 수정된 예제입니다.
+
+수정된 코드
+file:///home/luemier/llm/dags/emailNotifier.py
+example_dag.py
+
+import pendulum
+import logging
+from airflow.decorators import dag, task
+from airflow.exceptions import AirflowSkipException
+from airflow.models import Variable
+from emailNotifier import EmailNotifier
+
+logger = logging.getLogger(__name__)
+
+dag_info = Variable.get("dag_info", deserialize_json=True)
+
+# EmailNotifier 설정
+email_notifier = EmailNotifier(
+    from_email="dsllm-dp.sec@samsung.com",
+    to=["dsllm-dp.sec@samsung.com", "sejin78.yun@samsung.com"]
+)
+
+default_args = {
+    'on_failure_callback': email_notifier,
+    'on_retry_callback': email_notifier,
+}
+
+@dag(
+    dag_id="delete",
+    schedule="*/10 * * * *",
+    start_date=pendulum.parse(dag_info.get("start_date", "2024-04-10T00:00:00Z")).in_timezone("UTC"),
+    catchup=False,
+    is_paused_upon_creation=True,  # DAG가 생성될 때 자동으로 사용 중지
+    default_args=default_args
+)
+def delete():
+    @task
+    def check_upload_delete():
+        logger.info("This is the first task.")
+        # 태스크를 무조건 skip 처리
+        raise AirflowSkipException("This DAG has been disabled.")
+
+    @task
+    def get_job_id_list():
+        job_id = []
+        return job_id
+    
+    @task
+    def dedup():
+        pass
+    
+    @task
+    def parse():
+        pass
+
+    # 태스크 의존성 설정
+    check_upload_delete() >> get_job_id_list() >> dedup() >> parse()
+
+dag_instance = delete()
+
+
+설명
+EmailNotifier 클래스 정의:
+
+BaseNotifier를 상속받아 EmailNotifier 클래스를 정의합니다.
+__init__ 메서드에서 이메일 알림에 필요한 매개변수를 초기화합니다.
+from_email을 dsllm-dp.sec@samsung.com으로 설정하고, to를 ["dsllm-dp.sec@samsung.com", "sejin78.yun@samsung.com"]으로 설정합니다.
+subject_template_path와 html_template_path를 Airflow 설정 파일에서 가져오도록 설정합니다. 설정 파일에 값이 없을 경우 기본 경로를 사용합니다.
+notify 메서드에서 subject_template_path에 지정된 파일의 내용을 읽어와 템플릿으로 사용하고, 이메일 제목을 생성합니다.
+html_template_path에 지정된 파일의 내용을 읽어와 템플릿으로 사용하고, 이메일 내용을 생성합니다.
+__call__ 메서드를 추가하여 인스턴스가 호출될 때 notify_on_failure 또는 notify_on_retry 메서드를 호출하도록 설정합니다. context['task_instance'].try_number가 1보다 큰 경우 notify_on_retry를 호출하고, 그렇지 않은 경우 notify_on_failure를 호출합니다.
+notify_on_failure 메서드를 추가하여 실패 시 이메일 알림을 보내는 로직을 구현합니다.
+notify_on_retry 메서드를 추가하여 재실행 시 이메일 알림을 보내는 로직을 구현합니다.
+EmailNotifier 설정:
+
+EmailNotifier 클래스를 인스턴스화하여 email_notifier 객체를 생성합니다.
+DAG 정의:
+
+@dag 데코레이터를 사용하여 DAG을 정의합니다.
+schedule, start_date, catchup, default_args 등의 속성을 설정합니다.
+default_args에 on_failure_callback과 on_retry_callback을 email_notifier 인스턴스로 설정합니다.
+태스크 정의:
+
+@task 데코레이터를 사용하여 check_upload_delete, get_job_id_list, dedup, parse 태스크를 정의합니다.
+check_upload_delete 태스크에서 AirflowSkipException을 발생시켜 태스크를 무조건 skip 상태로 처리합니다.
+태스크 의존성 설정:
+
+check_upload_delete 태스크가 get_job_id_list, dedup, parse 태스크를 순차적으로 실행하도록 의존성을 설정합니다.
+이 코드는 BaseNotifier를 상속받아 EmailNotifier 클래스를 정의하고, on_failure_callback과 on_retry_callback을 EmailNotifier 클래스의 인스턴스로 설정하여 실패 및 재실행 시 이메일 알림을 보내는 예제입니다. 이를 통해 특정 태스크가 실패하거나 재실행될 때 각각 다른 이메일 알림을 보내는 로직을 구현할 수 있습니다.
+
+_file
+
+
