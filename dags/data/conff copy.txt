@@ -1,0 +1,25 @@
+{
+    "src_id": "5f1b3b3b9f1f4b0001f3b3b3",
+    "src_type": "conff",
+    "src_sub_type": "dag",
+    "auth_group_lsit": ["llm"],
+    "data" : {
+        "name" : "conff copy",
+        "createid" : "conff copy",
+        "modifiedid" : "llm",
+        "modifiedtime" : "20241218121230",
+        "dag" : {
+            "tasks" : [
+                {
+                    "task_id" : "task_1",
+                    "operator" : "BashOperator",
+                    "bash_command" : "echo 'hello world'"
+                }
+            ]
+        },
+        "tags" : ["example"],
+        "add_info": {"space_id" : "aaa", "space_name":"bbb"}
+    },
+    "createtime" : "20241218121230",
+    "wgt_param": {"count": 11, "view":34}
+}
