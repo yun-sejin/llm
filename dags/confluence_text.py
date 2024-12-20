@@ -86,7 +86,7 @@ def process_extracted_files(confluence_folder):
             data_bytea = json.dumps(data).encode('utf-8')
             # bytea_str = f"\\x{data_bytea.hex()}"
             contents["data"] = data_bytea
-            
+             
             # Change all values in contents from '값 to "값
             # contents = json.dumps(contents).replace("'", '"')
             # contents = json.loads(contents)
