@@ -37,10 +37,10 @@ def process_extracted_files(confluence_folder):
     new_text_files = {}
     
     raw_content = []
-    contents = {}
-    data = {}
     
     for file_name in text_files:
+        contents = {}
+        data = {}
         if file_name in html_files:
             html_path = html_files[file_name]
             text_path = text_files[file_name]
@@ -81,54 +81,25 @@ def process_extracted_files(confluence_folder):
                 print(html_content)
                 
                 data["contents"] = html_content
-                contents["data"] = data
-        
-        else:
-            text_path = text_files[file_name]
             
-            # print(f'Reading text file: {text_path}')
-            with open(text_path, 'r', encoding='utf-8') as f:
-                text_content = f.read()
-                print(f'Content of {file_path}:')
-                print(text_content)
-    
-                # 문자열을 딕셔너리로 변환
-                try:
-                    # JSON 문자열에서 "contents" 키의 값을 추출
-                    json_string = text_content.strip().strip('"')
-                    
-                    # 이스케이프 문자 제거
-                    json_string = json_string.replace('\n', '').replace('\\"', '"')
-                    
-                    text_content_json = json.loads(json_string)
-                    print('Converted to dictionary:')
-                    print(text_content_json)
-                    
-                    # spaceview 처리
-                    spaceview = text_content_json.get("spaceview", [])
-                    data = {}
-                    data["page_list"] = [view.get("groupName") for view in spaceview]
-                    print('Data with page_list:')
-                    print(data)
-                except json.JSONDecodeError as e:
-                    print(f'Error decoding JSON: {e}')
+            # Convert data to bytea
+            data_bytea = json.dumps(data).encode('utf-8')
+            # bytea_str = f"\\x{data_bytea.hex()}"
+            contents["data"] = data_bytea
+            
+            # Change all values in contents from '값 to "값
+            # contents = json.dumps(contents).replace("'", '"')
+            # contents = json.loads(contents)
         
         print(data)
-        print(contents)    
+        print(contents)
+        print("json dump========================")
         print("=====================================")
-    raw_content.append(contents) 
-    print(raw_content)      
+        raw_content.append(contents) 
+        print(raw_content)      
                 
-             
-            # prefix = 'confluence'
-            # src_id = f'{prefix}_{text_content_json.get("id", "unknown_id")}'
-            # new_text_files[file_name] = {
-            #     'data': html_content,
-            #     'confluence_id': src_id
-            # }
-                
-    print(f'New text files dictionary: {new_text_files}')
-    print(f'Contents object: {contents}')
+    # print(f'New text files dictionary: {new_text_files}')
+    # print(f'Contents object: {contents}')
 
 def read_html_file(file_path):
     print(f'Reading HTML file from {file_path}')
