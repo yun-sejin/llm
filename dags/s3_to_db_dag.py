@@ -40,7 +40,7 @@ def insert_history_record(file_key, success_yn, msg=None):
         password="your_password",
         host="your_host"
     )
-    try:
+    try: 
         with conn:
             with conn.cursor() as cur:
                 insert_sql = """

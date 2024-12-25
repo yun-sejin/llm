@@ -18,7 +18,7 @@ def upload_to_s3(bucket_name, zip_filename, s3_key):
     s3_client = boto3.client('s3')
     s3_client.upload_file(zip_filename, bucket_name, s3_key)
 
-def main():
+def main(): 
     source_folder = '/path/to/source/folder'
     bucket_name = 'your-s3-bucket-name'
     date_str = datetime.now().strftime('%Y%m%d')

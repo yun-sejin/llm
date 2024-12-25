@@ -16,7 +16,7 @@ class TestValidateDocument(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(message, "")
         self.assertEqual(file_name, 'info.txt')
-
+ 
     @patch('builtins.open', new_callable=mock_open, read_data='{"key1": "value1"}')
     def test_validate_required_info_txt_missing_key(self, mock_file):
         result, message, file_name = self.validator.validate_required_info_txt()

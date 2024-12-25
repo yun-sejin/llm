@@ -152,7 +152,7 @@ def process_extracted_files(confluence_folder):
         print(raw_content)      
     
     insert_raw_content(raw_content)
-    
+     
     #1.Validat the extracted files
     doc_validator = ValidateFactory.create_validator("document")
     mismatched = doc_validator.validate_mismatched_pairs()

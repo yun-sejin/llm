@@ -62,7 +62,7 @@ def read_zip_file(zip_path):
         file_list = zip_ref.namelist()
     print(f'Finished reading ZIP file. Contents: {file_list}')
     return file_list
-
+  
 # Example usage
 bucket_name = 'your-bucket-name'
 object_key = 'confluence.zip'

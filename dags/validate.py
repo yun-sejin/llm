@@ -299,7 +299,7 @@ class ValidateDocument(ValidateFactory):
         
         Args:
             file_keys (list): List of file keys to validate.
-        
+         
         Returns:
             tuple: (bool, str) indicating if all files are valid and an error message if not.
         """

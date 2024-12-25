@@ -12,5 +12,5 @@ VALUES (
     :src_sub_type,
     :raw_content,
     CURRENT_TIMESTAMP
-);
+); 
 -- ...existing code...

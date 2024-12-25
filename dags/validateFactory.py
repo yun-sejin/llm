@@ -21,5 +21,5 @@ class ValidateFactory:
             return ValidateDocument()
         elif validator_type == "file":
             return ValidateFile()
-        else:
+        else:  
             raise ValueError(f"Unknown validator type: {validator_type}")
