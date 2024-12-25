@@ -1,8 +1,26 @@
 import json
 import zipfile
 import os
+import psycopg2
+import requests
+
+from llm.dags.validate import ValidateDocument
+from llm.dags.validateFactory import ValidateFactory
 
 # ...existing code...
+
+class MailNotifier:
+    @staticmethod
+    def send_email(subject, body):
+        # Replace with your actual mail API endpoint and parameters
+        mail_api_url = "https://api.mailprovider.com/send"
+        payload = {
+            "subject": subject,
+            "body": body,
+            "to": "recipient@example.com"
+        }
+        response = requests.post(mail_api_url, json=payload)
+        return response.status_code == 200
 
 def unzip_file(zip_path, extract_to):
     confluence_folder = os.path.join(extract_to, 'confluence')
@@ -18,6 +36,58 @@ def unzip_file(zip_path, extract_to):
         process_extracted_files(confluence_folder)
         
     print(f'Extraction complete.')
+
+def insert_raw_content(raw_content):
+    conn = psycopg2.connect(
+        dbname="your_db",
+        user="your_user",
+        password="your_password",
+        host="your_host"
+    )
+    try:
+        with conn:
+            with open("/home/luemier/llm/llm/dags/parse.sql", "r", encoding="utf-8") as f:
+                sql_content = f.read()
+
+            # Convert named placeholders like :id to psycopg2-style %(id)s
+            insert_sql = (
+                sql_content
+                .replace(":id", "%(id)s")
+                .replace(":src_type", "%(src_type)s")
+                .replace(":src_sub_type", "%(src_sub_type)s")
+                .replace(":raw_content", "%(raw_content)s")
+            )
+
+            with conn.cursor() as cur:
+                for idx, item in enumerate(raw_content, start=1):
+                    params = {
+                        "id": idx,
+                        "src_type": "confluence",
+                        "src_sub_type": "page",
+                        "raw_content": str(item)
+                    }
+                    cur.execute(insert_sql, params)
+    finally:
+        conn.close()
+
+def insert_failed_files(failed_files):
+    conn = psycopg2.connect(
+        dbname="your_db",
+        user="your_user",
+        password="your_password",
+        host="your_host"
+    )
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                for failed_file in failed_files:
+                    insert_sql = """
+                    INSERT INTO error_logs (file_name, error_message, created_at)
+                    VALUES (%s, %s, CURRENT_TIMESTAMP)
+                    """
+                    cur.execute(insert_sql, (failed_file["fileName"], failed_file["errMessage"]))
+    finally:
+        conn.close()
 
 def process_extracted_files(confluence_folder):
     html_files = {}
@@ -72,7 +142,6 @@ def process_extracted_files(confluence_folder):
             
             # Convert data to bytea
             data_bytea = json.dumps(data).encode('utf-8')
-            # bytea_str = f"\\x{data_bytea.hex()}"
             contents["data"] = data_bytea
         
         print(data)
@@ -81,6 +150,49 @@ def process_extracted_files(confluence_folder):
         print("=====================================")
         raw_content.append(contents) 
         print(raw_content)      
+    
+    insert_raw_content(raw_content)
+    
+    #1.Validat the extracted files
+    doc_validator = ValidateFactory.create_validator("document")
+    mismatched = doc_validator.validate_mismatched_pairs()
+    print("Mismatched pairs:", mismatched)
+    
+    # Example usage
+    confluence_folder = '/home/luemier/llm/llm/dags/data'
+    validator = ValidateDocument()
+    is_valid, failed_files, valid_files = validator.validate_html_txt_pairs(confluence_folder)
+
+    if is_valid:
+        insert_raw_content(valid_files)
+    else:
+        insert_raw_content(valid_files)
+        # insert_failed_files(failed_files)
+        MailNotifier.send_email(
+            subject="Validation Failed",
+            body=f"Failed files: {failed_files}"
+        )
+
+    print(f'Validation result: {is_valid}')
+    print(f'Failed files: {failed_files}')
+    print(f'Valid files: {valid_files}')
+
+    #2.validate text files
+    # Example usage
+    file_paths = [
+        '/home/luemier/llm/llm/dags/data/11111.txt',
+        '/home/luemier/llm/llm/dags/data/11112.txt',
+        # Add more file paths as needed
+    ]
+    required_keys = ["src_id", "dag"]
+    validator = ValidateDocument()
+    is_valid, failed_files = validator.validate_multiple_json_txt_files(file_paths, required_keys)
+
+    print(f'Validation result: {is_valid}')
+    print(f'Failed files: {failed_files}')
+
+    
+    return raw_content
 
 def read_html_file(file_path):
     print(f'Reading HTML file from {file_path}')
@@ -96,180 +208,6 @@ def read_zip_file(zip_path):
     print(f'Finished reading ZIP file. Contents: {file_list}')
     return file_list
 
-class ValidateFactory:
-    @staticmethod
-    def create_validator(validator_type, extract_to, file_name, required_keys):
-        if validator_type == "document":
-            return ValidateDocument(extract_to, file_name, required_keys)
-        elif validator_type == "file":
-            return ValidateFile(extract_to, file_name, required_keys), file_name
-        else:
-            raise ValueError(f"Unknown validator type: {validator_type}")
-
-class ValidateDocument(ValidateFactory):
-    def __init__(self, extract_to, file_name, required_keys):
-        self.extract_to = extract_to
-        self.file_name = file_name
-        self.required_keys = required_keys
-
-    def validate_required_info_txt(self):
-        
-        info_txt_path = os.path.join(self.extract_to, self.file_name)
-        
-        with open(info_txt_path, 'r', encoding='utf-8') as f:
-            info_content = f.read()
-            info_json = json.loads(info_content)
-            
-            for key in self.required_keys:
-                if key not in info_json:
-                    print(f'Key {key} is missing in {self.file_name}.')
-                    return False, f'Key {key} is missing', self.file_name
-        
-        print(f'All required keys are present in {self.file_name}.')
-        return True, "", self.file_name
-
-    def validate_html_txt_pairs(self, zip_path):
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            file_list = zip_ref.namelist()
-            html_files = set()
-            txt_files = set()
-            
-            for file in file_list:
-                if file == 'info.txt':
-                    continue
-                if file.endswith('.html'):
-                    html_files.add(file.split('.')[0])
-                elif file.endswith('.txt'):
-                    txt_files.add(file.split('.')[0])
-            
-            missing_pairs = html_files.symmetric_difference(txt_files)
-            if missing_pairs:
-                print(f'Missing pairs: {missing_pairs}')
-                return False, f'Missing pairs: {missing_pairs}', list(missing_pairs)
-        
-        print('All HTML and TXT files are properly paired.')
-        return True, "", []
-
-    def validate_required_keys(self, json_content):
-        for key in self.required_keys:
-            if key not in json_content:
-                print(f'Key {key} is missing in the JSON content.')
-                return False, f'Key {key} is missing', self.file_name
-        print('All required keys are present in the JSON content.')
-        return True, ""
-
-    def validate_txt_files(self, confluence_folder):
-        required_keys = ["id", "contents", "ancesotor", "url"]
-        failed_files = []
-        for root, dirs, files in os.walk(confluence_folder):
-            for file in files:
-                if file.endswith('.txt'):
-                    file_path = os.path.join(root, file)
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        text_content = f.read()
-                        try:
-                            start_index = text_content.find('"contents" : ') + len('"contents" : ')
-                            json_string = text_content[start_index:].strip().strip('"')
-                            json_string = json_string.replace('\n', '').replace('\\"', '"')
-                            text_content_json = json.loads(json_string)
-                            missing_keys = [key for key in required_keys if key not in text_content_json]
-                            if missing_keys:
-                                print(f'Missing keys {missing_keys} in {file}')
-                                failed_files.append(file)
-                        except json.JSONDecodeError as e:
-                            print(f'Error decoding JSON in {file}: {e}')
-                            failed_files.append(file)
-        if failed_files:
-            return False, f'Missing keys in files: {failed_files}', failed_files
-        return True, "", []
-
-    def validate_html_files(self, confluence_folder):
-        failed_files = []
-        for root, dirs, files in os.walk(confluence_folder):
-            for file in files:
-                if file.endswith('.html'):
-                    file_path = os.path.join(root, file)
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        html_content = f.read()
-                        if not html_content.strip():
-                            print(f'HTML content is empty in {file}')
-                            failed_files.append(file)
-        if failed_files:
-            return False, f'HTML content is empty in files: {failed_files}', failed_files
-        return True, "", []
-
-class ValidateFile(ValidateFactory):
-    def __init__(self, extract_to, file_name, required_keys):
-        self.extract_to = extract_to
-        self.file_name = file_name
-        self.required_keys = required_keys
-
-    def validate_info_txt_exists(self, zip_path):
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            if 'info.txt' not in zip_ref.namelist():
-                print('info.txt file does not exist in the zip archive.')
-                return False, 'info.txt file does not exist in the zip archive.'
-        
-        print('info.txt file exists in the zip archive.')
-        return True, ''
-    
-    def validate_info_txt(self):
-        # if self.file_name != 'info.txt':
-        #     print(f'File name {self.file_name} does not match info.txt.')
-        #     return False, "File name does not match info.txt", self.file_name
-        
-        
-        info_txt_path = os.path.join(self.extract_to, self.file_name)
-        # if not os.path.exists(info_txt_path):
-        #     print(f'{info_txt_path} does not exist.')
-        #     return False, "File does not exist", self.file_name
-        
-        with open(info_txt_path, 'r', encoding='utf-8') as f:
-            info_content = f.read()
-            info_json = json.loads(info_content)
-            
-            for key in self.required_keys:
-                if key not in info_json:
-                    print(f'Key {key} is missing in {self.file_name}.')
-                    return False, f'Key {key} is missing', self.file_name
-        
-        print(f'All required keys are present in {self.file_name}.')
-        return True, "", self.file_name
-
-    def validate_contents_file_pairs(self, zip_path):
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            file_list = zip_ref.namelist()
-            html_files = set()
-            txt_files = set()
-            
-            for file in file_list:
-                if file == 'info.txt':
-                    continue
-                if file.endswith('.html'):
-                    html_files.add(file.split('.')[0])
-                elif file.endswith('.txt'):
-                    txt_files.add(file.split('.')[0])
-            
-            missing_pairs = html_files.symmetric_difference(txt_files)
-            if missing_pairs:
-                print(f'Missing pairs: {missing_pairs}')
-                return False, f'Missing pairs: {missing_pairs}', list(missing_pairs)
-        
-        print('All HTML and TXT files are properly paired.')
-        return True, "", []
-
-    def validate_at_least_one_file(self, zip_path):
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            file_list = zip_ref.namelist()
-            if not file_list:
-                print('No files found in the zip archive.')
-                return False, 'No files found in the zip archive.'
-        
-        print('At least one file exists in the zip archive.')
-        return True, ''
-
-   
-
 # Example usage
 download_path = '/home/luemier/llm2/dags/data/space4.zip'
 extract_to = '/home/luemier/llm2/dags/data'  # Updated extraction path
@@ -278,11 +216,15 @@ print(f'Unzipping {download_path} to {extract_to}')
 unzip_file(download_path, extract_to)
 print('Done.')
 
+
+#validate the extracted files
 required_keys = ["spaceid", "spacename", "type"]
 file_name = 'info.txt'
-validator2 = ValidateFactory.create_validator("document", extract_to, file_name, required_keys)
-validator, file_name = ValidateFactory.create_validator("file", extract_to, file_name, required_keys)
-validator2.validate_file_pairs(download_path, file_name)
+validator2 = ValidateFactory.create_validator("document")
+validator2.initialize(extract_to, file_name, required_keys)
+validator2.validate_html_txt_pairs(download_path)
+validator = ValidateFactory.create_validator("file")
+validator.initialize(extract_to, file_name, required_keys)
 is_valid, err_message, failed_file = validator.validate_info_txt()
 
 fail_files = {"fail_file_name": [], "err_message": ""}
