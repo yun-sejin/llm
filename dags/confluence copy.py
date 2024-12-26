@@ -1,5 +1,4 @@
 # import boto3
-from some_module import SpacePermissionExtractor  # Replace 'some_module' with the actual module name
 import zipfile
 import os
 
@@ -18,10 +17,6 @@ def unzip_file(zip_path, extract_to):
     print(f'Starting to extract {zip_path} to {confluence_folder}')
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         zip_ref.extractall(confluence_folder)
-        print(f'Reading ZIP file from {zip_path}')
-        # file_list = zip_ref.namelist()
-        print(f'Finished reading ZIP file. Contents: {file_list}')
-    
         process_extracted_files(confluence_folder)
         
     print(f'Extraction complete.')
@@ -53,11 +48,6 @@ def process_extracted_files(confluence_folder):
                 json_content = f.read()
                 print(f'Content of {json_path}:')
                 print(json_content)
-                
-                if 'spacepermissionextractor' in json_path:
-                    extractor = SpacePermissionExtractor()
-                    parsed_content = extractor.extract_values(json_content)
-                    print(parsed_content)
 
 def read_html_file(file_path):
     print(f'Reading HTML file from {file_path}')

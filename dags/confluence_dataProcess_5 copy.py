@@ -2,25 +2,25 @@ import json
 import re
 
 class DataProcessor:
-    def __init__(self, data, data2):
-        self.data = json.loads(data)
-        self.data2 = json.loads(data2)
-        self.data2_list = []
+    def __init__(self, info, content):
+        self.info = json.loads(info)
+        self.content = json.loads(content)
+        self.content_list = []
 
     def extract_titles(self):
-        for ancestor in self.data2.get("ancestors", []):
+        for ancestor in self.content.get("ancestors", []):
             if "title" in ancestor:
-                self.data2_list.append(ancestor["title"])
+                self.content_list.append(ancestor["title"])
 
     def add_spaceid_to_list(self):
-        self.data2_list.insert(0, self.data["spaceid"])
+        self.content_list.append(self.content["title"])
 
     def process(self):
         self.extract_titles()
         self.add_spaceid_to_list()
-        return self.data2_list
+        return self.content_list
 
-data = '''{
+info = '''{
     "spaceid": "6789",
     "spacename": "space 2",
     "spacepermissions": [{
@@ -70,9 +70,9 @@ data = '''{
           }]
 }'''
 
-data2 = '''{
-    "spaceid": "6789",
-    "spacename": "space 2",
+content = '''{
+    "id": "1216789",
+    "title": "title 4",
     "ancestors": [
             {
                 "id": "123445",
@@ -89,7 +89,7 @@ data2 = '''{
         ]
 }'''
 
-processor = DataProcessor(data, data2)
+processor = DataProcessor(info, content)
 result = processor.process()
 print(result)
 
