@@ -20,7 +20,7 @@ def insert_error_log(message, connection_params):
         # Commit the transaction
         conn.commit()
         print("Messages inserted successfully.")
-        
+          
     except Exception as e:
         print(f"Failed to insert messages: {e}")
         

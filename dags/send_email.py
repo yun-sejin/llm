@@ -116,7 +116,7 @@ def process_and_send_emails(connection_params, subject, recipient, api_url, api_
         
         # Prepare the message content
         message = [{'src_id': row[0], 'error': row[1], 'etc': row[2]} for row in rows]
-        
+         
         # Create the HTML content
         html_content = create_html_content(message)
         
