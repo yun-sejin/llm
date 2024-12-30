@@ -1,0 +1,9 @@
+CREATE TABLE failed_files (
+    id SERIAL PRIMARY KEY,
+    src_id VARCHAR(255) NOT NULL,
+    error TEXT NOT NULL,
+    etc JSONB,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    email_sent BOOLEAN DEFAULT FALSE
+)
+DISTRIBUTE BY HASH(src_id);
