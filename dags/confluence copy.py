@@ -66,9 +66,8 @@ def read_zip_file(zip_path):
 # Example usage
 bucket_name = 'your-bucket-name'
 object_key = 'confluence.zip'
-download_path = '/home/luemier/llm2/dags/data/space4.zip'
-extract_to = '/home/luemier/llm2/dags/data2'  # Updated extraction path
-html_file_path = os.path.join(extract_to, 'confluence', '11111.html')
+download_path = '/home/luemier/llm/llm/dags/data/space4.zip'
+extract_to = '/home/luemier/llm/llm/dags/data'  # Updated extraction path
 zip_file_path = download_path
 
 # print(f'Downloading {object_key} from bucket {bucket_name} to {download_path}')
@@ -77,8 +76,6 @@ print(f'Unzipping {download_path} to {extract_to}')
 unzip_file(download_path, extract_to)
 print('Done.')
 
-# html_content = read_html_file(html_file_path)
-# print(html_content)
 
 zip_contents = read_zip_file(zip_file_path)
 print(zip_contents)
