@@ -286,5 +286,47 @@ for data in all_data: all_data 리스트의 각 딕셔너리 항목을 반복합
 writer.writerow(data): 각 딕셔너리 항목을 CSV 파일에 한 줄씩 씁니다.
 이 코드는 all_data 리스트에 있는 딕셔너리 데이터를 CSV 파일로 저장합니다.
 
+------------------------------------------------
+shutil.rmtree(temp_dir)
+-------------------------------------------------
+  shutil.rmtree(temp_dir)
 
-       
+는 지정된 디렉토리(temp_dir)와 그 안의 모든 파일 및 하위 디렉토리를 재귀적으로 삭제합니다.
+
+예제 코드
+다음은 shutil.rmtree(temp_dir)를 사용하는 예제입니다:
+
+import shutil
+import os
+
+# 임시 디렉토리 생성 (예제용)
+temp_dir = '/path/to/temp_dir'
+os.makedirs(temp_dir, exist_ok=True)
+
+# 임시 디렉토리와 그 안의 모든 내용 삭제
+shutil.rmtree(temp_dir)
+
+# 삭제 확인
+if not os.path.exists(temp_dir):
+    print(f"{temp_dir} has been deleted.")
+else:
+    print(f"Failed to delete {temp_dir}.")
+
+코드에 적용
+현재 코드에 shutil.rmtree(temp_dir)를 사용하는 부분을 추가해 보겠습니다.
+
+import shutil
+
+def cleanup_temp_dir(temp_dir):
+    try:
+        shutil.rmtree(temp_dir)
+        print(f"Temporary directory {temp_dir} has been deleted.")
+    except Exception as e:
+        print(f"Failed to delete {temp_dir}: {e}")
+
+# 예제 사용
+temp_dir = '/path/to/temp_dir'
+cleanup_temp_dir(temp_dir)
+
+이 코드는 temp_dir 디렉토리와 그 안의 모든 파일 및 하위 디렉토리를 삭제하고, 성공 여부를 출력합니다.
+

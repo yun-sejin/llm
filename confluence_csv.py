@@ -1,3 +1,4 @@
+# import boto3
 import os
 from pathlib import Path
 import zipfile
@@ -6,6 +7,7 @@ import csv
 import tempfile
 import subprocess
 import requests
+import shutil
 
 def download_file_from_s3(bucket_name, object_key, dest_folder):
     ...
@@ -44,16 +46,6 @@ def combine_matching_files_to_list(extracted_folder):
             if file_name not in files_dict:
                 files_dict[file_name] = {}
             files_dict[file_name][file_ext] = file_path
-     
-    # for root, _, files in os.walk(extracted_folder):
-    #     for file in files:
-    #         file_path = Path(root) / file
-    #         file_name = file_path.stem
-    #         file_ext = file_path.suffix
-    #         if file_name not in files_dict:
-    #             files_dict[file_name] = {}
-    #         files_dict[file_name][file_ext] = Path(root) / file       
-            
     
     for file_name, paths in files_dict.items():
         if '.txt' in paths and '.html' in paths:
@@ -91,7 +83,7 @@ def write_data_to_csv(all_data, zip_file_path):
             writer.writerow(data)
     
     print(f"CSV file created at {csv_file_path}")
-    return csv_file_path
+    return csv_file_path, temp_dir
 
 def load_csv_with_psql(csv_file_path, db_config):
     psql_command = (
@@ -132,7 +124,7 @@ if __name__ == "__main__":
     zip_file_path = dest_folder / "space4.zip"
     extract_zip_file(zip_file_path, dest_folder)
     all_data, fail_data = combine_matching_files_to_list(dest_folder)
-    csv_file_path = write_data_to_csv(all_data, zip_file_path)
+    csv_file_path, temp_dir = write_data_to_csv(all_data, zip_file_path)
     
     db_config = {
         'dbname': 'your_dbname',
@@ -141,11 +133,17 @@ if __name__ == "__main__":
         'host': 'your_host',
         'port': 'your_port'
     }
-    # load_csv_with_psql(csv_file_path, db_config)
-    # print(f"CSV file path: {csv_file_path}")
-    # print(f"Failed data: {fail_data}")
     
-    # email_api_url = "https://api.your-email-service.com/send"  # Replace with your email API URL
-    # email_api_key = "your-email-api-key"  # Replace with your email API key
-    # recipient_email = "recipient@example.com"  # Replace with the recipient's email address
-    # send_fail_data_email(fail_data, email_api_url, email_api_key, recipient_email)
+    try:
+        load_csv_with_psql(csv_file_path, db_config)
+    finally:
+        shutil.rmtree(temp_dir)
+        print(f"Temporary directory {temp_dir} deleted")
+    
+    print(f"CSV file path: {csv_file_path}")
+    print(f"Failed data: {fail_data}")
+    
+    email_api_url = "https://api.your-email-service.com/send"  # Replace with your email API URL
+    email_api_key = "your-email-api-key"  # Replace with your email API key
+    recipient_email = "recipient@example.com"  # Replace with the recipient's email address
+    send_fail_data_email(fail_data, email_api_url, email_api_key, recipient_email)
