@@ -2,6 +2,7 @@ from airflow import DAG
 from airflow.decorators import dag, task
 from airflow.utils.dates import days_ago
 from airflow.models.baseoperator import chain
+from airflow.notifications.basenotifier import BaseNotifier
 import tempfile
 import pendulum
 import os
@@ -16,6 +17,26 @@ import json
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
+
+class KnoxNotifier(BaseNotifier):
+    def send_notification(self, subject, body, recipient, attachment_paths=None):
+        api_url = 'https://api.example.com/send-email'
+        payload = {
+            'subject': subject,
+            'body': body,
+            'recipient': recipient
+        }
+        files = [('attachment', open(path, 'rb')) for path in attachment_paths] if attachment_paths else None
+        response = requests.post(api_url, json=payload, files=files)
+        if response.status_code == 200:
+            print("Notification sent via API")
+            if attachment_paths:
+                for path in attachment_paths:
+                    invalid_data_dir = Path(path).parent
+                    shutil.rmtree(invalid_data_dir)
+                    print(f"Invalid data directory {invalid_data_dir} deleted")
+        else:
+            print(f"Failed to send notification via API. Status code: {response.status_code}")
 
 default_args = {
     'owner': 'airflow',
@@ -77,7 +98,8 @@ def new_confluence_dag():
                     invalid_data.append({"file": txt_file.name, "error": "Validation failed"})
         store_valid_data(valid_data)
         invalid_data_dir, invalid_data_file = save_invalid_data(invalid_data)
-        send_invalid_data_api(invalid_data, invalid_data_dir, invalid_data_file)
+        csv_file_path = save_invalid_data_to_csv(invalid_data)
+        return invalid_data_dir, invalid_data_file, invalid_data, csv_file_path
 
     def validate_row(row):
         # Add your validation logic here
@@ -104,26 +126,37 @@ def new_confluence_dag():
         print(f"Invalid data saved to {invalid_data_file}")
         return invalid_data_dir, invalid_data_file
 
-    def send_invalid_data_api(data, invalid_data_dir, invalid_data_file):
-        api_url = 'https://api.example.com/send-email'
-        payload = {
-            'subject': 'Invalid Data Notification',
-            'body': 'The following data rows are invalid:\n\n' + '\n'.join([str(row) for row in data]),
-            'recipient': 'recipient@example.com'
-        }
-        # with open(invalid_data_file, 'rb') as file:
-        # data = file.read()
-        # # 파일 데이터를 처리하는 코드
-        # print(data)
-        files = {'attachment': open(invalid_data_file, 'rb')}
-        response = requests.post(api_url, json=payload, files=files)
-        if response.status_code == 200:
-            print("Invalid data email sent via API")
-            # Delete the invalid data directory
-            shutil.rmtree(invalid_data_dir)
-            print(f"Invalid data directory {invalid_data_dir} deleted")
-        else:
-            print(f"Failed to send email via API. Status code: {response.status_code}")
+    def save_invalid_data_to_csv(data):
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        invalid_data_dir = Path(tempfile.mkdtemp(dir='/tmp/confluence_invalid_data')) / timestamp
+        invalid_data_dir.mkdir(parents=True, exist_ok=True)
+        csv_file_path = invalid_data_dir / 'invalid_data.csv'
+        with open(csv_file_path, 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(['file', 'error'])
+            for item in data:
+                writer.writerow([item['file'], item['error']])
+        print(f"Invalid data saved to {csv_file_path}")
+        return csv_file_path
+
+    def create_html_content(invalid_data):
+        html_content = "<html><body><h1>Invalid Data Notification</h1><table border='1'><tr><th>File</th><th>Error</th></tr>"
+        for item in invalid_data:
+            html_content += f"<tr><td>{item['file']}</td><td>{item['error']}</td></tr>"
+        html_content += "</table></body></html>"
+        return html_content
+
+    @task
+    def send_invalid_data_api(file_path, invalid_data, csv_file_path):
+        if file_path:
+            notifier = KnoxNotifier()
+            html_content = create_html_content(invalid_data)
+            notifier.send_notification(
+                subject='Invalid Data Notification',
+                body=html_content,
+                recipient='recipient@example.com',
+                attachment_paths=[file_path, csv_file_path]
+            )
 
     @task(trigger_rule="all_success")
     def cleanup(base_tmp_dir):
@@ -133,10 +166,11 @@ def new_confluence_dag():
     base_tmp_dir = create_temp_dir()
     uuid_dir = generate_uuid(base_tmp_dir)
     extracted_dir = copy_and_extract_file(uuid_dir)
-    validate_and_store_data(extracted_dir)
+    invalid_data_dir, invalid_data_file, invalid_data, csv_file_path = validate_and_store_data(extracted_dir)
+    send_invalid_data_api(invalid_data_file, invalid_data, csv_file_path)
     cleanup(base_tmp_dir)
 
-    chain(base_tmp_dir, uuid_dir, extracted_dir, validate_and_store_data, cleanup)
+    chain(base_tmp_dir, uuid_dir, extracted_dir, invalid_data_dir, invalid_data_file, send_invalid_data_api, cleanup)
     
 dag = new_confluence_dag()
 
