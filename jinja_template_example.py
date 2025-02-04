@@ -15,22 +15,26 @@ default_args = {
 def qna_processing_dag():
     @task
     def push_data():
-        # 여기서는 예시 데이터를 생성하고 XCom으로 푸시합니다.
+        try:
         data = {'file_path': '{{ var.value.json_file_path }}'}  # Jinja 템플릿을 사용하여 변수 값 동적으로 설정
-        fail_files = ['file1.json', 'file2.json']
-        # Airflow Variable에서 'json_file_path' 변수의 값을 직접 가져옵니다.
-        # file_path = Variable.get("json_file_path")
-        # data = {'file_path': file_path}
-
-        return data, fail_files
+            data = {'file_path': '{{ var.value.json_file_path }}'}  # Jinja 템플릿을 사용하여 변수 값 동적으로 설정
+            fail_files = ['file1.json', 'file2.json']
+            return data, fail_files
+        except Exception as e:
+            print(f"Error in push_data: {e}")
+            raise
 
     @task
     def process_json_file(data):
-        # XCom에서 데이터를 풀합니다.
-        # data = ti.xcom_pull(task_ids='push_data')
-        # file_path = data['file_path']
-        # 파일 경로를 사용하여 JSON 파일 처리
-        print(f"Processed {data}")
+        try:
+            # XCom에서 데이터를 풀합니다.
+            # data = ti.xcom_pull(task_ids='push_data')
+            # file_path = data['file_path']
+            # 파일 경로를 사용하여 JSON 파일 처리
+            print(f"Processed {data}")
+        except Exception as e:
+            print(f"Error in process_json_file: {e}")
+            raise
 
     push_data_task = push_data()
     process_file_task = process_json_file(push_data_task)

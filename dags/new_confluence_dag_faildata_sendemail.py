@@ -148,20 +148,28 @@ def new_confluence_dag():
 
     @task
     def send_invalid_data_api(file_path, invalid_data, csv_file_path):
-        if file_path:
-            notifier = KnoxNotifier()
-            html_content = create_html_content(invalid_data)
-            notifier.send_notification(
-                subject='Invalid Data Notification',
-                body=html_content,
-                recipient='recipient@example.com',
-                attachment_paths=[file_path, csv_file_path]
-            )
+        try:
+            if file_path:
+                notifier = KnoxNotifier()
+                html_content = create_html_content(invalid_data)
+                notifier.send_notification(
+                    subject='Invalid Data Notification',
+                    body=html_content,
+                    recipient='recipient@example.com',
+                    attachment_paths=[file_path, csv_file_path]
+                )
+        except Exception as e:
+            print(f"Error in send_invalid_data_api: {e}")
+            raise
 
     @task(trigger_rule="all_success")
     def cleanup(base_tmp_dir):
-        shutil.rmtree(base_tmp_dir)
-        print(f"Temporary directory {base_tmp_dir} deleted")
+        try:
+            shutil.rmtree(base_tmp_dir)
+            print(f"Temporary directory {base_tmp_dir} deleted")
+        except Exception as e:
+            print(f"Error in cleanup: {e}")
+            raise
 
     base_tmp_dir = create_temp_dir()
     uuid_dir = generate_uuid(base_tmp_dir)
