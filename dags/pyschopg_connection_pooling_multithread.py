@@ -1,11 +1,12 @@
 import json
-import psycopg2
-from psycopg2.pool import SimpleConnectionPool  # New import for connection pooling
 import boto3
 from airflow.decorators import dag, task
 from datetime import datetime, timedelta, timezone
-from airflow.models import Variable  # New import for variable management
+from airflow.models import Variable
 from airflow.operators.python import get_current_context
+
+# Import the connection pool wrapper class
+from dags.psycopg_connection_pooling_class import PGConnectionPoolWrapper
 
 default_args = {
     "owner": "airflow",
@@ -14,7 +15,7 @@ default_args = {
 @dag(
     default_args=default_args,
     schedule=None,
-    start_date=datetime(2023, 1, 1),
+    start_date=datetime(2023,1,1),
     catchup=False,
     tags=["read"],
     params={"bucket_name": "your-s3-bucket-name"}  # Set to "upload_dev" or "upload_prod" as needed.
@@ -24,16 +25,8 @@ def read_dsllm_job_history_pipeline():
     @task
     def read_job_history():
         try:
-            # Create a connection pool with 1 to 10 connections.
-            pool = SimpleConnectionPool(
-                1, 10,
-                dbname='llmdp',
-                user='airflow',
-                password='airflow',
-                host='localhost',
-                port='5432'
-            )
-            conn = pool.getconn()
+            pool_wrapper = PGConnectionPoolWrapper(minconn=1, maxconn=10)
+            conn = pool_wrapper.get_conn()
             with conn.cursor() as cur:
                 query = """
                     SELECT h1.file_path_lists
@@ -54,8 +47,8 @@ def read_dsllm_job_history_pipeline():
                         break
                     all_rows.extend(chunk)
                 print(f"Total file_path_list rows: {len(all_rows)}")
-            pool.putconn(conn)
-            pool.closeall()
+            pool_wrapper.put_conn(conn)
+            pool_wrapper.close_all()
             return all_rows
         except Exception as e:
             print(f"Error reading job history: {e}")
@@ -66,11 +59,9 @@ def read_dsllm_job_history_pipeline():
         import json
         import boto3
         from datetime import datetime, timedelta, timezone
-        # Retrieve bucket_name from the task context using DAG parameters.
         context = get_current_context()
         bucket_name = context["params"].get("bucket_name", "default-bucket")
         
-        # Determine delete_days via Variables based on bucket_name.
         if bucket_name == "upload_dev":
             delete_days = int(Variable.get("delete_days_upload_dev", 3))
         elif bucket_name == "upload_prod":
@@ -81,7 +72,6 @@ def read_dsllm_job_history_pipeline():
         cutoff = datetime.now(timezone.utc) - timedelta(days=delete_days)
         s3 = boto3.client('s3')
         
-        # Parse file_path_lists column value (assumed to be JSON string or dict)
         file_data = row[0]
         try:
             file_dict = file_data if isinstance(file_data, dict) else json.loads(file_data)
@@ -89,13 +79,11 @@ def read_dsllm_job_history_pipeline():
             print(f"Error parsing file_data: {e}")
             file_dict = {}
         
-        # Extract folder list from key 'file_path'
         folder_list = file_dict.get("file_path", [])
         if not isinstance(folder_list, list):
             print("file_path value is not a list; converting to list.")
             folder_list = [folder_list]
         
-        # For each folder, delete objects older than the cutoff timestamp.
         for folder in folder_list:
             print(f"Checking S3 folder with prefix: {folder} in bucket: {bucket_name}")
             response = s3.list_objects_v2(Bucket=bucket_name, Prefix=folder)

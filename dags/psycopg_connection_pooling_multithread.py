@@ -1,10 +1,10 @@
 import json
 import psycopg2
-from psycopg2.pool import SimpleConnectionPool  # New import for connection pooling
+from psycopg2.pool import ThreadedConnectionPool  # Use ThreadedConnectionPool for multithreaded pooling
 import boto3
 from airflow.decorators import dag, task
 from datetime import datetime, timedelta, timezone
-from airflow.models import Variable  # New import for variable management
+from airflow.models import Variable
 from airflow.operators.python import get_current_context
 
 default_args = {
@@ -14,7 +14,7 @@ default_args = {
 @dag(
     default_args=default_args,
     schedule=None,
-    start_date=datetime(2023, 1, 1),
+    start_date=datetime(2023,1,1),
     catchup=False,
     tags=["read"],
     params={"bucket_name": "your-s3-bucket-name"}  # Set to "upload_dev" or "upload_prod" as needed.
@@ -24,8 +24,8 @@ def read_dsllm_job_history_pipeline():
     @task
     def read_job_history():
         try:
-            # Create a connection pool with 1 to 10 connections.
-            pool = SimpleConnectionPool(
+            # Create a threaded connection pool with min=1 and max=10 connections.
+            pool = ThreadedConnectionPool(
                 1, 10,
                 dbname='llmdp',
                 user='airflow',
@@ -66,11 +66,9 @@ def read_dsllm_job_history_pipeline():
         import json
         import boto3
         from datetime import datetime, timedelta, timezone
-        # Retrieve bucket_name from the task context using DAG parameters.
         context = get_current_context()
         bucket_name = context["params"].get("bucket_name", "default-bucket")
         
-        # Determine delete_days via Variables based on bucket_name.
         if bucket_name == "upload_dev":
             delete_days = int(Variable.get("delete_days_upload_dev", 3))
         elif bucket_name == "upload_prod":
@@ -81,7 +79,6 @@ def read_dsllm_job_history_pipeline():
         cutoff = datetime.now(timezone.utc) - timedelta(days=delete_days)
         s3 = boto3.client('s3')
         
-        # Parse file_path_lists column value (assumed to be JSON string or dict)
         file_data = row[0]
         try:
             file_dict = file_data if isinstance(file_data, dict) else json.loads(file_data)
@@ -89,13 +86,11 @@ def read_dsllm_job_history_pipeline():
             print(f"Error parsing file_data: {e}")
             file_dict = {}
         
-        # Extract folder list from key 'file_path'
         folder_list = file_dict.get("file_path", [])
         if not isinstance(folder_list, list):
             print("file_path value is not a list; converting to list.")
             folder_list = [folder_list]
         
-        # For each folder, delete objects older than the cutoff timestamp.
         for folder in folder_list:
             print(f"Checking S3 folder with prefix: {folder} in bucket: {bucket_name}")
             response = s3.list_objects_v2(Bucket=bucket_name, Prefix=folder)

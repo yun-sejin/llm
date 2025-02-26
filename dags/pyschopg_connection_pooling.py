@@ -24,6 +24,22 @@ def read_dsllm_job_history_pipeline():
     @task
     def read_job_history():
         try:
+#             **최소 연결 수(1)**와 **최대 연결 수(10)**를 지정합니다.
+# 데이터베이스 이름은 'llmdp', 사용자명은 'airflow', 암호는 'airflow', 그리고 호스트와 포트는 각각 'localhost'와 '5432'로 설정되어 있습니다.
+# 이 풀을 통해 작업이 완료된 후에 연결을 반환하여 여러 쿼리에서 이를 재활용할 수 있습니다.
+# 이 코드는 psycopg2의 SimpleConnectionPool 클래스를 사용하여 PostgreSQL 데이터베이스에 대한 연결 풀(최소 1개, 최대 10개)을 생성합니다. 이렇게 생성된 연결 풀을 사용하면 여러 작업이나 쿼리에서 데이터베이스 연결을 재사용할 수 있으므로, 매번 새로운 연결을 생성하는 오버헤드를 줄이고 성능을 개선할 수 있습니다.
+            
+#             psycopg2의 SimpleConnectionPool 자체에는 고정된 최대 연결 수 제한이 없습니다.
+# 즉, 풀을 생성할 때 사용자가 최대 연결 수(maxconn)를 임의의 정수로 설정할 수 있습니다. 다만, 실제로 사용할 수 있는 최대 연결 수는 다음에 의해 결정됩니다:
+
+# PostgreSQL 서버의 max_connections 설정:
+# 서버 설정에 따라 동시에 허용되는 연결 수가 제한됩니다. 기본값은 보통 100이지만, 서버 설정에 따라 다릅니다.
+
+# 시스템 자원:
+# 메모리나 CPU 등의 시스템 자원에 따라 많은 연결을 유지하는 것이 비효율적일 수 있습니다.
+
+# 따라서 풀의 최대 연결 수는 사용자의 설정 값과 PostgreSQL 서버의 max_connections 및 시스템 자원에 의존합니다.
+
             # Create a connection pool with 1 to 10 connections.
             pool = SimpleConnectionPool(
                 1, 10,

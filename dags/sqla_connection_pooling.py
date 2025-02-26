@@ -1,15 +1,18 @@
 import json
-import psycopg2
-from psycopg2.pool import SimpleConnectionPool  # New import for connection pooling
+from sqlalchemy import create_engine
 import boto3
 from airflow.decorators import dag, task
 from datetime import datetime, timedelta, timezone
-from airflow.models import Variable  # New import for variable management
+from airflow.models import Variable
 from airflow.operators.python import get_current_context
 
 default_args = {
     "owner": "airflow",
 }
+
+# SQLAlchemy engine with pooling parameters:
+# pool_size: initial pool size; max_overflow: additional connections.
+DATABASE_URL = "postgresql+psycopg2://airflow:airflow@localhost:5432/llmdp"
 
 @dag(
     default_args=default_args,
@@ -24,18 +27,8 @@ def read_dsllm_job_history_pipeline():
     @task
     def read_job_history():
         try:
-            # Create a connection pool with 1 to 10 connections.
-            pool = SimpleConnectionPool(
-                1, 10,
-                dbname='llmdp',
-                user='airflow',
-                password='airflow',
-                host='localhost',
-                port='5432'
-            )
-            conn = pool.getconn()
-            with conn.cursor() as cur:
-                query = """
+            engine = create_engine(DATABASE_URL, pool_size=5, max_overflow=10)
+            query = """
                     SELECT h1.file_path_lists
                     FROM dsllm_job_hist h1
                     JOIN dsllm_job_hist h2 ON h1.after_job_id = h2.job_id
@@ -45,17 +38,12 @@ def read_dsllm_job_history_pipeline():
                       AND h2.job_type = 'airflow'
                       AND h2.success_yn = TRUE
                       AND h2.err_msg IS NULL
-                """
-                cur.execute(query)
-                all_rows = []
-                while True:
-                    chunk = cur.fetchmany(100)
-                    if not chunk:
-                        break
-                    all_rows.extend(chunk)
+                    """
+            with engine.connect() as connection:
+                result_proxy = connection.execute(query)
+                all_rows = result_proxy.fetchall()
                 print(f"Total file_path_list rows: {len(all_rows)}")
-            pool.putconn(conn)
-            pool.closeall()
+            engine.dispose()
             return all_rows
         except Exception as e:
             print(f"Error reading job history: {e}")
@@ -66,11 +54,10 @@ def read_dsllm_job_history_pipeline():
         import json
         import boto3
         from datetime import datetime, timedelta, timezone
-        # Retrieve bucket_name from the task context using DAG parameters.
+        # Retrieve bucket_name from the context.
         context = get_current_context()
         bucket_name = context["params"].get("bucket_name", "default-bucket")
         
-        # Determine delete_days via Variables based on bucket_name.
         if bucket_name == "upload_dev":
             delete_days = int(Variable.get("delete_days_upload_dev", 3))
         elif bucket_name == "upload_prod":
@@ -81,7 +68,6 @@ def read_dsllm_job_history_pipeline():
         cutoff = datetime.now(timezone.utc) - timedelta(days=delete_days)
         s3 = boto3.client('s3')
         
-        # Parse file_path_lists column value (assumed to be JSON string or dict)
         file_data = row[0]
         try:
             file_dict = file_data if isinstance(file_data, dict) else json.loads(file_data)
@@ -89,13 +75,11 @@ def read_dsllm_job_history_pipeline():
             print(f"Error parsing file_data: {e}")
             file_dict = {}
         
-        # Extract folder list from key 'file_path'
         folder_list = file_dict.get("file_path", [])
         if not isinstance(folder_list, list):
             print("file_path value is not a list; converting to list.")
             folder_list = [folder_list]
         
-        # For each folder, delete objects older than the cutoff timestamp.
         for folder in folder_list:
             print(f"Checking S3 folder with prefix: {folder} in bucket: {bucket_name}")
             response = s3.list_objects_v2(Bucket=bucket_name, Prefix=folder)
